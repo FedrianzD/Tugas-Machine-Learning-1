@@ -1,5 +1,7 @@
 import random
 from AutoDiff import Value
+import numpy as np
+from sklearn.datasets import make_moons, make_blobs
 
 class Neuron():
     def __init__(self, n_input, activation_function="linear"):
@@ -16,9 +18,11 @@ class Neuron():
         if (self.activation_function=="linear"):
             return c
         elif (self.activation_function=="relu"):
-            return c.RELU()
-        # else:
-            # for now only linear & relu
+            return c.relu()
+        elif (self.activation_function=="sigmoid"):
+            return 1/(1 + exp(-c))
+        else:
+            return c # Default
 
     def parameters(self):
         return self.weight + [self.bias]
@@ -26,8 +30,6 @@ class Neuron():
     def reset_gradient(self):
         for p in self.parameters():
             p.gradient = 0
-
-    # def __repr__(self):
 
 class Layer():
     def __init__(self, n_input, n_output, **kwargs):
@@ -46,8 +48,6 @@ class Layer():
     def reset_gradient(self):
         for p in self.parameters():
             p.gradient = 0
-
-    # def __repr__(self):
 
 class FFNN():
     def __init__(self, layers, activation_functions, loss_function, weight_initializer, batch_size, learning_rate, epoch, verbose):
@@ -86,46 +86,43 @@ class FFNN():
         return
     
     def fit(self, X, y):
-        # # Check that X and y have correct shape, set n_features_in_, etc.
-        # X, y = validate_data(self, X, y)
-        # # Store the classes seen during fit
-        # self.classes_ = unique_labels(y)
-
-        # self.X_ = X
-        # self.y_ = y
-        # # Return the classifier
-        # return self
-        
-        if batch_size is None:
+        if self.batch_size is None:
             Xb, yb = X, y
         else:
             ri = np.random.permutation(X.shape[0])[:batch_size]
             Xb, yb = X[ri], y[ri]
         inputs = [list(map(Value, xrow)) for xrow in Xb]
         
-        outputs = list(map(model, inputs))
-        losses = [(yi - scorei)**2 for yi, scorei in zip(yb, scores)]
-        loss = sum(losses)/len(losses)
-        
-        for k in range(epoch):
+        for k in range(self.epoch):
+            outputs = list(map(self, inputs))
+            losses = [(y - output)**2 for y, output in zip(yb, outputs)]
+            loss = sum(losses)/len(losses)
             self.reset_gradient()
-            loss.updateGradients()
+            loss.updateGradients() # Back propagation
             for p in self.parameters():
-                p.value -= p.gradient * learning_rate
+                p.value -= p.gradient * self.learning_rate
                 
-            if k%verbose==0:
+            if (self.verbose==1):
                 print(f'Epoch {k}, Loss: {loss.value}')
         return
 
-    def predict():
-        return
+    def predict(self, X):
+        inputs = [list(map(Value, xrow)) for xrow in X]
+        outputs = [1 if self(x).value > 0 else 0 for x in inputs]
+        return outputs
     
     def save():
         return
     
     def load():
         return
+
+# Test
+# if __name__ == "__main__":
+#     X, y = make_moons(n_samples=100, noise=0.1)
     
-    # def __repr__(self):
-        
-        
+#     model = FFNN(layers=[16, 16, 1], activation_functions=["relu", "linear"], loss_function="mse", weight_initializer="random", batch_size=None, learning_rate=0.1, epoch=1000, verbose=1)
+#     model.fit(X, y)
+#     print(model.predict(X))
+#     accuracy = sum(model.predict(X) == y) / len(y)
+#     print(accuracy)
