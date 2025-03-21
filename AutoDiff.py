@@ -1,6 +1,7 @@
 from collections import defaultdict
 from typing import List
 from Utils import topological_sort
+from math import exp
 
 class Value:
     # Constructor
@@ -60,6 +61,16 @@ class Value:
     # Negasi
     def __neg__(self):
         return self * -1
+    
+    # EXPONENTIAL FUNCTION
+    def exp(self):
+        out = Value(exp(self.value), (self,), 'exp')
+        
+        def _updatePreviousGradients():
+            self.gradient += out.value * out.gradient
+        out._updatePreviousGradients = _updatePreviousGradients
+
+        return out
 
     # ACTIVATION FUNCTIONS
     # RELU

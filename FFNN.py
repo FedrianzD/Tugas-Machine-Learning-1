@@ -20,7 +20,7 @@ class Neuron():
         elif (self.activation_function=="relu"):
             return c.relu()
         elif (self.activation_function=="sigmoid"):
-            return 1/(1 + exp(-c))
+            return 1/(1 + (-c).exp())
         else:
             return c # Default
 
