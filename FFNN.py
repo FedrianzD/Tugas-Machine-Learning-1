@@ -1,9 +1,9 @@
-import random
 from AutoDiff import Value
 import numpy as np
 from sklearn.datasets import make_moons, make_blobs
-
+import pickle
 import math
+from graphviz import Digraph
 
 class ActivationFunctions:
     def linear(x):
@@ -47,27 +47,35 @@ class LossFunctions:
 
 class Neuron():
     def __init__(self, n_input, activation_function="linear"):
-        self.weight = [Value(random.uniform(-1,1)) for _ in range(n_input)]
-        self.bias = Value(0)
         self.activation_function = activation_function
+        self.n_input = n_input
+        self.weight = [Value(0) for i in range(n_input)]
+        self.bias = Value(0)
+        self.c = 0
 
     def __call__(self, x):
-        if isinstance(x[0], list):  # Batch input
-            return [self(single_x) for single_x in x]
-        
         c = sum((wi * xi for wi, xi in zip(self.weight, x)), self.bias)
         
+        # Activation functions
         if (self.activation_function=="linear"):
-            return c
+            self.c = c
         elif (self.activation_function=="relu"):
-            return c.relu()
+            self.c = c.relu()
         elif (self.activation_function=="sigmoid"):
-            return 1/(1 + (-c).exp())
+            self.c = 1/(1 + (-c).exp())
+        elif (self.activation_function=="tanh"):
+            self.c = (c.exp() - (-c).exp()) / (c.exp() + (-c).exp())
+        elif (self.activation_function=="softmax"):
+            exp_c = [ci.exp() for ci in c]
+            sum_exp_c = sum(exp_c)
+            self.c = [expi / sum_exp_c for expi in exp_c]
         else:
-            return c # Default
+            self.c = c.relu() # Default = relu
+        
+        return self.c
 
     def parameters(self):
-        return self.weight + [self.bias]
+        return [self.bias] + self.weight
     
     def reset_gradient(self):
         for p in self.parameters():
@@ -78,39 +86,53 @@ class Layer():
         self.neurons = [Neuron(n_input, **kwargs) for _ in range(n_output)]
 
     def __call__(self, x):
-        if isinstance(x[0], list):  # Batch input
-            return [[n(single_x) for n in self.neurons] for single_x in x]
-        
         out = [n(x) for n in self.neurons]
         return out[0] if len(out) == 1 else out
 
+    def parameters_matrix(self):
+        return [neuron.parameters() for neuron in self.neurons]
+    
     def parameters(self):
-        return [p for n in self.neurons for p in n.parameters()]
+        return [p for neuron in self.neurons for p in neuron.parameters()]
     
     def reset_gradient(self):
         for p in self.parameters():
             p.gradient = 0
 
 class FFNN():
-    def __init__(self, layers, activation_functions, loss_function, weight_initializer, batch_size, learning_rate, epoch, verbose):
+    def __init__(self, layers=[], activation_functions="relu", loss_function="mse" , batch_size=None, learning_rate=0.1, epoch=10, verbose=1, random_state=0):
         self.layers = [Layer(layers[i], layers[i+1], activation_function=activation_functions[i]) for i in range(len(layers)-1)]
         self.loss_function = loss_function
-        self.weight_initializer = weight_initializer
         self.batch_size = batch_size
         self.learning_rate = learning_rate
         self.epoch = epoch
         self.verbose = verbose
+        self.rng = np.random.default_rng(random_state)
 
+    def weight_initializer(self, weight_initializer="zero", seed=0, lower_bound=-1, upper_bound=1, mean=0, variance=0.1):
+        rng = np.random.default_rng(seed)
+        for layer in self.layers:
+            for neuron in layer.neurons:
+                if (weight_initializer=="zero"):
+                    weights = [0 for i in range(neuron.n_input+1)]
+                elif (weight_initializer=="uniform"):
+                    weights = rng.uniform(lower_bound, upper_bound, size=neuron.n_input+1)
+                elif (weight_initializer=="normal"):
+                    weights = rng.normal(mean, variance, size=neuron.n_input+1)
+                else: # Default = zero
+                    weights = [0 for i in range(neuron.n_input+1)]
+                
+                neuron.weight = [Value(w) for w in weights[:-1]]
+                neuron.bias = Value(weights[-1])
+    
     def __call__(self, x):
-        if isinstance(x[0], list):
-            for layer in self.layers:
-                x = [layer(sample) for sample in x]
-            return x
-        
         for layer in self.layers:
             x = layer(x)
         return x
 
+    def parameters_matrix(self):
+        return [layer.parameters_matrix() for layer in self.layers]
+    
     def parameters(self):
         return [p for layer in self.layers for p in layer.parameters()]
     
@@ -118,34 +140,45 @@ class FFNN():
         for p in self.parameters():
             p.gradient = 0
     
-    def visualize_graph(self):
-        return
-    
-    def visualize_weight_distribution(self, layers):
-        return
-    
-    def visualize_weight_gradient_distibution(self, layers):
-        return
     
     def fit(self, X, y):
-        if self.batch_size is None:
-            Xb, yb = X, y
-        else:
-            ri = np.random.permutation(X.shape[0])[:batch_size]
-            Xb, yb = X[ri], y[ri]
+        Xb, yb = X, y
         inputs = [list(map(Value, xrow)) for xrow in Xb]
+        n_samples = len(yb)
+        
+        if self.batch_size is None:
+            self.batch_size = n_samples
         
         for k in range(self.epoch):
-            outputs = list(map(self, inputs))
-            losses = [(y - output)**2 for y, output in zip(yb, outputs)]
-            loss = sum(losses)/len(losses)
-            self.reset_gradient()
-            loss.updateGradients() # Back propagation
-            for p in self.parameters():
-                p.value -= p.gradient * self.learning_rate
+            indices = self.rng.permutation(n_samples)
+            X_shuffled = [inputs[i] for i in indices]
+            y_shuffled = [yb[i] for i in indices]
+            
+            for start in range(0, n_samples, self.batch_size):
+                end = min(start + self.batch_size, n_samples)
+                X_batch = X_shuffled[start:end]
+                y_batch = y_shuffled[start:end]
                 
-            if (self.verbose==1):
-                print(f'Epoch {k}, Loss: {loss.value}')
+                outputs = list(map(self, X_batch))
+                
+                # Loss function
+                if self.loss_function == "mse":
+                    loss = sum([(y - output)**2 for y, output in zip(y_batch, outputs)]) / len(y_batch)
+                elif self.loss_function == "binary_cross_entropy":
+                    loss = -1 * sum([y * output.log() + (1 - y) * (1 - output).log() for y, output in zip(y_batch, outputs)]) / len(y_batch)
+                elif self.loss_function == "categorical_cross_entropy":
+                    loss = sum([sum([yj * outputj.log() for yj, outputj in zip(y, output)]) for y, output in zip(y_batch, outputs)]) / len(y_batch)
+                else:  # Default = mse
+                    loss = sum([(y - output)**2 for y, output in zip(y_batch, outputs)]) / len(y_batch)
+                
+                self.reset_gradient()
+                loss.updateGradients()  # Back propagation
+                for p in self.parameters():
+                    p.value -= p.gradient * self.learning_rate
+                # print(f'Epoch {k}, Loss: {loss.value}')
+            
+            if self.verbose == 1:
+                print(f'Epoch {k}, Iteration {start//self.batch_size}, Loss: {loss.value}')
         return
 
     def predict(self, X):
@@ -153,18 +186,80 @@ class FFNN():
         outputs = [1 if self(x).value > 0 else 0 for x in inputs]
         return outputs
     
-    def save():
-        return
+    def save(self, filename="model.pkl"):
+        pickle.dump(self, open(filename, 'wb'))
+        return self
     
-    def load():
-        return
+    def load(self, filename):
+        model = pickle.load(open(filename, 'rb'))
+        self.layers = model.layers
+        self.loss_function = model.loss_function
+        self.batch_size = model.batch_size
+        self.learning_rate = model.learning_rate
+        self.epoch = model.epoch
+        self.verbose = model.verbose
+        return self
+    
+    def visualize_graph(self):
+        w = self.parameters_matrix()
+        print(w)
+        
+        dot = Digraph(graph_attr={'rankdir': "LR", 'splines': 'line', 
+                                "nodesep": '1', "ranksep": '1.5'})
 
-# Test
-# if __name__ == "__main__":
-#     X, y = make_moons(n_samples=100, noise=0.1)
+        input_nodes = [(f'{0}{0}', 'b0')]  # Bias node
+        for i in range(len(w[0][0]) - 1):
+            input_nodes.append((f'{0}{i+1}', f'X{i+1}'))
+
+        input_nodes.sort()
+
+        with dot.subgraph() as s:
+            s.attr(rank='same')
+            prev_node = None
+            for node_id, label in input_nodes:
+                s.node(node_id, label, shape="ellipse", fixedsize="true", width="0.8", height="0.5")
+                if prev_node:
+                    dot.edge(prev_node, node_id, style="invis")
+                prev_node = node_id
+
+        for i, layer in enumerate(self.layers):
+            layer_nodes = []
+            
+            if i != len(self.layers) - 1:
+                layer_nodes.append((f'{i+1}{0}', f'b{i+1}'))
+            
+            # Neurons
+            for j, neuron in enumerate(layer.neurons):
+                if i != len(self.layers) - 1:
+                    layer_nodes.append((f'{i+1}{j+1}', f'h{i+1}{j+1}'))
+                else:
+                    layer_nodes.append((f'{i+1}{j+1}', f'o{j+1}'))
+
+            layer_nodes.sort()
+
+            with dot.subgraph() as s:
+                s.attr(rank='same')
+                prev_node = None
+                for node_id, label in layer_nodes:
+                    s.node(node_id, label, shape="ellipse", fixedsize="true", width="0.8", height="0.5")
+                    if prev_node:
+                        dot.edge(prev_node, node_id, style="invis")
+                    prev_node = node_id
+
+            for j, neuron in enumerate(layer.neurons):
+                for k, weight in enumerate(w[i][j]):
+                    weight_label = "{ w = %.4f | g = %.4f }" % (weight.value, weight.gradient)
+                    weight_node = f'w{i+1}{j+1}{k}'
+
+                    dot.node(weight_node, weight_label, shape='record', width="1", height="0.5")
+
+                    dot.edge(f'{i}{k}', weight_node, tailport="e", headport="w")
+                    dot.edge(weight_node, f'{i+1}{j+1}', tailport="e", headport="w")
+
+        return dot
     
-#     model = FFNN(layers=[16, 16, 1], activation_functions=["relu", "linear"], loss_function="mse", weight_initializer="random", batch_size=None, learning_rate=0.1, epoch=1000, verbose=1)
-#     model.fit(X, y)
-#     print(model.predict(X))
-#     accuracy = sum(model.predict(X) == y) / len(y)
-#     print(accuracy)
+    def visualize_weight_distribution(self, layers):
+        return
+    
+    def visualize_weight_gradient_distibution(self, layers):
+        return
