@@ -1,7 +1,7 @@
 from collections import defaultdict
 from typing import List
 from Utils import topological_sort
-from math import exp
+from math import exp, log
 
 class Value:
     # Constructor
@@ -68,6 +68,16 @@ class Value:
         
         def _updatePreviousGradients():
             self.gradient += out.value * out.gradient
+        out._updatePreviousGradients = _updatePreviousGradients
+
+        return out
+    
+    # NATURAL LOGARITHM
+    def log(self):
+        out = Value(log(self.value), (self,), 'log')
+        
+        def _updatePreviousGradients():
+            self.gradient += (1 / self.value) * out.gradient
         out._updatePreviousGradients = _updatePreviousGradients
 
         return out
