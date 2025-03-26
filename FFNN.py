@@ -64,14 +64,11 @@ class Layer():
 class FFNN():
     def __init__(self, layers=[], activation_functions="relu", loss_function=None, 
                  batch_size=None, learning_rate=0.1, epoch=10, verbose=1, random_state=0):
-        # Add label encoder and decoder
         self.label_encoder = None
         self.label_decoder = None
         
-        # Rest of the initialization remains the same
         self.layers = [Layer(layers[i], layers[i+1], activation_function=activation_functions[i]) for i in range(len(layers)-1)]
-        
-        # Determine classification type based on output layer
+                
         self.n_classes = layers[-1]
         if loss_function is None:
             self.loss_function = "binary_cross_entropy" if self.n_classes == 1 else "categorical_cross_entropy"
@@ -142,11 +139,6 @@ class FFNN():
     def fit(self, X, y):
         y_encoded = self.encode_labels(y)
         
-        self.n_classes = len(np.unique(y_encoded))
-        
-        if self.layers[-1].neurons[0].n_input != self.n_classes:
-            self.layers = self.layers[:-1] + [Layer(self.layers[-2].neurons[0].n_input, self.n_classes, activation_function="relu")]
-        
         Xb, yb = X, y_encoded
         inputs = [list(map(Value, xrow)) for xrow in Xb]
         n_samples = len(yb)
@@ -156,7 +148,7 @@ class FFNN():
             # Binary classification
             y_processed = yb
         else:
-            # Multiclass classification - one-hot encode
+            # Multiclass classification
             y_processed = np.zeros((n_samples, self.n_classes))
             for i, label in enumerate(yb):
                 y_processed[i, label] = 1
