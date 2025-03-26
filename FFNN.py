@@ -4,6 +4,8 @@ from sklearn.datasets import make_moons, make_blobs
 import pickle
 import math
 from graphviz import Digraph
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 class Neuron():
     def __init__(self, n_input, activation_function="linear"):
@@ -258,8 +260,36 @@ class FFNN():
 
         return dot
     
-    def visualize_weight_distribution(self, layers):
+    def visualize_weight_distribution(self, layer):
+        if not (0 <= layer < len(self.layers)):
+            print(f"Invalid layer index: {layer}")
+            return
+        fig, ax = plt.subplots(figsize=(12, 4))
+        weights = [p.value for neuron in self.layers[layer].neurons for p in neuron.weight]
+
+        bins = np.linspace(min(weights), max(weights), 10)
+        print(bins)
+        sns.histplot(weights, bins=bins, kde=True, ax=ax)
+        ax.set_title(f'Weight Distribution - Layer {layer + 1}')
+        ax.set_xlabel('Weight Value')
+        ax.set_ylabel('Frequency')
+        ax.set_xticks(np.round(bins, 2))
+        plt.tight_layout()
+        plt.show()
         return
     
-    def visualize_weight_gradient_distibution(self, layers):
+    def visualize_weight_gradient_distibution(self, layer):
+        if not (0 <= layer < len(self.layers)):
+            print(f"Invalid layer index: {layer}")
+            return
+        fig, ax = plt.subplots(figsize=(12, 4))
+        weights = [p.gradient for neuron in self.layers[layer].neurons for p in neuron.weight]
+        bins = np.linspace(min(weights), max(weights), 10)
+        sns.histplot(weights, bins=bins, kde=True, ax=ax)
+        ax.set_title(f'Weight Gradient Distribution - Layer {layer + 1}')
+        ax.set_xlabel('Weight Gradient Value')
+        ax.set_ylabel('Frequency')
+        ax.set_xticks(np.round(bins, 2))
+        plt.tight_layout()
+        plt.show()
         return
