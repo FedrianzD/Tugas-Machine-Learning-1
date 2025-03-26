@@ -62,6 +62,11 @@ class Layer():
 class FFNN():
     def __init__(self, layers=[], activation_functions="relu", loss_function=None, 
                  batch_size=None, learning_rate=0.1, epoch=10, verbose=1, random_state=0):
+        # Add label encoder and decoder
+        self.label_encoder = None
+        self.label_decoder = None
+        
+        # Rest of the initialization remains the same
         self.layers = [Layer(layers[i], layers[i+1], activation_function=activation_functions[i]) for i in range(len(layers)-1)]
         
         # Determine classification type based on output layer
@@ -76,6 +81,30 @@ class FFNN():
         self.epoch = epoch
         self.verbose = verbose
         self.rng = np.random.default_rng(random_state)
+
+    def encode_labels(self, y):
+        if np.issubdtype(np.array(y).dtype, np.integer):
+            unique_labels = np.unique(y)
+            self.label_encoder = {label: i for i, label in enumerate(unique_labels)}
+            self.label_decoder = {i: label for label, i in self.label_encoder.items()}
+            return np.array([self.label_encoder[label] for label in y])
+        
+        # Use sklearn's LabelEncoder if not already integers
+        from sklearn.preprocessing import LabelEncoder
+        le = LabelEncoder()
+        encoded_labels = le.fit_transform(y)
+        
+        # Store encoder and decoder
+        self.label_encoder = {label: code for label, code in zip(le.classes_, range(len(le.classes_)))}
+        self.label_decoder = {code: label for label, code in self.label_encoder.items()}
+        
+        return encoded_labels
+
+    def decode_labels(self, encoded_labels):
+        if self.label_decoder is None:
+            return encoded_labels
+        
+        return np.array([self.label_decoder.get(label, label) for label in encoded_labels])
 
     def weight_initializer(self, weight_initializer="zero", seed=0, lower_bound=-1, upper_bound=1, mean=0, variance=0.1):
         rng = np.random.default_rng(seed)
@@ -109,7 +138,14 @@ class FFNN():
             p.gradient = 0
     
     def fit(self, X, y):
-        Xb, yb = X, y
+        y_encoded = self.encode_labels(y)
+        
+        self.n_classes = len(np.unique(y_encoded))
+        
+        if self.layers[-1].neurons[0].n_input != self.n_classes:
+            self.layers = self.layers[:-1] + [Layer(self.layers[-2].neurons[0].n_input, self.n_classes, activation_function="relu")]
+        
+        Xb, yb = X, y_encoded
         inputs = [list(map(Value, xrow)) for xrow in Xb]
         n_samples = len(yb)
         
@@ -138,7 +174,6 @@ class FFNN():
                 
                 outputs = list(map(self, X_batch))
                 
-                # Loss function
                 if self.loss_function == "mse":
                     loss = sum([(y - output)**2 for y, output in zip(y_batch, outputs)]) / len(y_batch)
                 
@@ -174,7 +209,8 @@ class FFNN():
         else:
             outputs = [np.argmax([out.value for out in self(x)]) for x in inputs]
         
-        return outputs
+        # Decode labels back to original format
+        return self.decode_labels(outputs)
     
     def predict_proba(self, X):
         # Return probability distribution for each input
