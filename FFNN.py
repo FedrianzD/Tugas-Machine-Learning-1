@@ -42,8 +42,8 @@ class Neuron():
             p.gradient = 0
 
 class Layer():
-    def __init__(self, n_input, n_output, **kwargs):
-        self.neurons = [Neuron(n_input, **kwargs) for _ in range(n_output)]
+    def __init__(self, n_input, n_output, activation_function="linear"):
+        self.neurons = [Neuron(n_input, activation_function) for _ in range(n_output)]
 
     def __call__(self, x):
         out = [n(x) for n in self.neurons]
@@ -60,9 +60,17 @@ class Layer():
             p.gradient = 0
 
 class FFNN():
-    def __init__(self, layers=[], activation_functions="relu", loss_function="mse" , batch_size=None, learning_rate=0.1, epoch=10, verbose=1, random_state=0):
+    def __init__(self, layers=[], activation_functions="relu", loss_function=None, 
+                 batch_size=None, learning_rate=0.1, epoch=10, verbose=1, random_state=0):
         self.layers = [Layer(layers[i], layers[i+1], activation_function=activation_functions[i]) for i in range(len(layers)-1)]
-        self.loss_function = loss_function
+        
+        # Determine classification type based on output layer
+        self.n_classes = layers[-1]
+        if loss_function is None:
+            self.loss_function = "binary_cross_entropy" if self.n_classes == 1 else "categorical_cross_entropy"
+        else:
+            self.loss_function = loss_function
+        
         self.batch_size = batch_size
         self.learning_rate = learning_rate
         self.epoch = epoch
@@ -100,11 +108,20 @@ class FFNN():
         for p in self.parameters():
             p.gradient = 0
     
-    
     def fit(self, X, y):
         Xb, yb = X, y
         inputs = [list(map(Value, xrow)) for xrow in Xb]
         n_samples = len(yb)
+        
+        # Prepare labels based on classification type
+        if self.n_classes == 1:
+            # Binary classification
+            y_processed = yb
+        else:
+            # Multiclass classification - one-hot encode
+            y_processed = np.zeros((n_samples, self.n_classes))
+            for i, label in enumerate(yb):
+                y_processed[i, label] = 1
         
         if self.batch_size is None:
             self.batch_size = n_samples
@@ -112,7 +129,7 @@ class FFNN():
         for k in range(self.epoch):
             indices = self.rng.permutation(n_samples)
             X_shuffled = [inputs[i] for i in indices]
-            y_shuffled = [yb[i] for i in indices]
+            y_shuffled = y_processed[indices] if self.n_classes > 1 else [y_processed[i] for i in indices]
             
             for start in range(0, n_samples, self.batch_size):
                 end = min(start + self.batch_size, n_samples)
@@ -124,10 +141,16 @@ class FFNN():
                 # Loss function
                 if self.loss_function == "mse":
                     loss = sum([(y - output)**2 for y, output in zip(y_batch, outputs)]) / len(y_batch)
+                
+                # Binary Cross Entropy
                 elif self.loss_function == "binary_cross_entropy":
                     loss = -1 * sum([y * output.log() + (1 - y) * (1 - output).log() for y, output in zip(y_batch, outputs)]) / len(y_batch)
+                
+                # Categorical Cross Entropy
                 elif self.loss_function == "categorical_cross_entropy":
-                    loss = sum([sum([yj * outputj.log() for yj, outputj in zip(y, output)]) for y, output in zip(y_batch, outputs)]) / len(y_batch)
+                    loss = -1 * sum([sum([yj * outputj.log() for yj, outputj in zip(y, output)]) 
+                                     for y, output in zip(y_batch, outputs)]) / len(y_batch)
+                
                 else:  # Default = mse
                     loss = sum([(y - output)**2 for y, output in zip(y_batch, outputs)]) / len(y_batch)
                 
@@ -135,30 +158,47 @@ class FFNN():
                 loss.updateGradients()  # Back propagation
                 for p in self.parameters():
                     p.value -= p.gradient * self.learning_rate
-                # print(f'Epoch {k}, Loss: {loss.value}')
             
             if self.verbose == 1:
-                print(f'Epoch {k}, Iteration {start//self.batch_size}, Loss: {loss.value}')
+                print(f'Epoch {k}, Loss: {loss.value}')
         return
 
     def predict(self, X):
         inputs = [list(map(Value, xrow)) for xrow in X]
-        outputs = [1 if self(x).value > 0 else 0 for x in inputs]
+        
+        # Binary classification
+        if self.n_classes == 1:
+            outputs = [1 if self(x).value > 0 else 0 for x in inputs]
+        
+        # Multiclass classification
+        else:
+            outputs = [np.argmax([out.value for out in self(x)]) for x in inputs]
+        
         return outputs
     
-    def save(self, filename="model.pkl"):
-        pickle.dump(self, open(filename, 'wb'))
-        return self
+    def predict_proba(self, X):
+        # Return probability distribution for each input
+        inputs = [list(map(Value, xrow)) for xrow in X]
+        
+        # Binary classification
+        if self.n_classes == 1:
+            # Sigmoid output for binary classification
+            outputs = [self(x).value for x in inputs]
+        
+        # Multiclass classification
+        else:
+            outputs = [[out.value for out in self(x)] for x in inputs]
+        
+        return outputs
     
-    def load(self, filename):
-        model = pickle.load(open(filename, 'rb'))
-        self.layers = model.layers
-        self.loss_function = model.loss_function
-        self.batch_size = model.batch_size
-        self.learning_rate = model.learning_rate
-        self.epoch = model.epoch
-        self.verbose = model.verbose
-        return self
+    def save(self, filename='model.pkl'):
+        with open(filename, 'wb') as f:
+            pickle.dump(self, f)
+
+    @classmethod
+    def load(cls, filename):
+        with open(filename, 'rb') as f:
+            return pickle.load(f)
     
     def visualize_graph(self):
         w = self.parameters_matrix()
