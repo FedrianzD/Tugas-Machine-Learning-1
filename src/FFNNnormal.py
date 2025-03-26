@@ -3,6 +3,7 @@ from sklearn.datasets import make_moons, make_blobs
 import pickle
 import math
 from collections import defaultdict
+from graphviz import Digraph
 
 class Neuron():
     def __init__(self, n_input, activation_function="linear"):
@@ -31,6 +32,12 @@ class Neuron():
             exp_z = np.exp(z - np.max(z))
             self.output = exp_z / exp_z.sum()
         return self.output
+
+    def parameters(self):
+        return [self.bias] + self.weight
+    
+    def parameters_gradient(self):
+        return [self.gradient_bias] + self.gradient_weight
 
     def backward(self, gradient_output):
         if self.activation_function == "relu":
@@ -69,6 +76,12 @@ class Layer():
     def update(self, learning_rate, batch_size):
         for neuron in self.neurons:
             neuron.update(learning_rate, batch_size)
+            
+    def parameters_matrix(self):
+        return [neuron.parameters() for neuron in self.neurons]
+    
+    def parameters_gradient_matrix(self):
+        return [neuron.parameters_gradient() for neuron in self.neurons]
 
 class FFNN():
     def __init__(self, layers, activation_functions, loss_function="mse", learning_rate=0.1, epoch=10, batch_size=10, verbose=1, random_state=0):
@@ -165,3 +178,76 @@ class FFNN():
         if self.loss_function == "categorical_cross_entropy":
             return self.decode_labels(np.argmax(probas, axis=1))
         return self.decode_labels((probas >= 0.5).astype(int))
+
+    def parameters_matrix(self):
+        return [layer.parameters_matrix() for layer in self.layers]
+    
+    def parameters_gradient_matrix(self):
+        return [layer.parameters_gradient_matrix() for layer in self.layers]
+
+    def visualize_graph(self):
+        w = self.parameters_matrix()
+        g = self.parameters_gradient_matrix()
+        
+        dot = Digraph(graph_attr={'rankdir': "LR", 'splines': 'line', 
+                                "nodesep": '1', "ranksep": '1.5'})
+
+        input_nodes = [(f'{0}{0}', 'b0')]  # Bias node
+        for i in range(len(w[0][0]) - 1):
+            input_nodes.append((f'{0}{i+1}', f'X{i+1}'))
+
+        input_nodes.sort()
+
+        with dot.subgraph() as s:
+            s.attr(rank='same')
+            prev_node = None
+            for node_id, label in input_nodes:
+                s.node(node_id, label, shape="ellipse", fixedsize="true", width="0.8", height="0.5")
+                if prev_node:
+                    dot.edge(prev_node, node_id, style="invis")
+                prev_node = node_id
+
+        for i, layer in enumerate(self.layers):
+            layer_nodes = []
+            
+            if i != len(self.layers) - 1:
+                layer_nodes.append((f'{i+1}{0}', f'b{i+1}'))
+            
+            # Neurons
+            for j, neuron in enumerate(layer.neurons):
+                if i != len(self.layers) - 1:
+                    layer_nodes.append((f'{i+1}{j+1}', f'h{i+1}{j+1}'))
+                else:
+                    layer_nodes.append((f'{i+1}{j+1}', f'o{j+1}'))
+
+            layer_nodes.sort()
+
+            with dot.subgraph() as s:
+                s.attr(rank='same')
+                prev_node = None
+                for node_id, label in layer_nodes:
+                    s.node(node_id, label, shape="ellipse", fixedsize="true", width="0.8", height="0.5")
+                    if prev_node:
+                        dot.edge(prev_node, node_id, style="invis")
+                    prev_node = node_id
+
+            for j, neuron in enumerate(layer.neurons):
+                for k in range(len(w[i][j])):
+                    weight_label = "{ w = %.4f | g = %.4f }" % (w[i][j][k], g[i][j][k])
+                    weight_node = f'w{i+1}{j+1}{k}'
+
+                    dot.node(weight_node, weight_label, shape='record', width="1", height="0.5")
+
+                    dot.edge(f'{i}{k}', weight_node, tailport="e", headport="w")
+                    dot.edge(weight_node, f'{i+1}{j+1}', tailport="e", headport="w")
+
+        return dot
+
+    def save(self, filename='model.pkl'):
+        with open(filename, 'wb') as f:
+            pickle.dump(self, f)
+
+    @classmethod
+    def load(cls, filename):
+        with open(filename, 'rb') as f:
+            return pickle.load(f)

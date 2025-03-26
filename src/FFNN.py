@@ -232,7 +232,6 @@ class FFNN():
     
     def visualize_graph(self):
         w = self.parameters_matrix()
-        print(w)
         
         dot = Digraph(graph_attr={'rankdir': "LR", 'splines': 'line', 
                                 "nodesep": '1', "ranksep": '1.5'})
