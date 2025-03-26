@@ -15,7 +15,7 @@ class Value:
     def updateGradients(self):
         # Gradient/turunan dari diri sendiri = 1
         self.gradient = 1
-        update_order = reversed(topological_sort(self))
+        update_order = topological_sort(self)
         for node in update_order:
             node._updatePreviousGradients()
 
