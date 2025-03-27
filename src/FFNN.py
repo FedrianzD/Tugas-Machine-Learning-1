@@ -169,13 +169,17 @@ class FFNN():
                 y_batch = y_shuffled[i:i+self.batch_size]
                 
                 outputs = np.array([self(x) for x in X_batch])
+                
                 loss = self.compute_loss(y_batch, outputs)
                 total_loss += loss
                 
                 gradients = self.compute_loss_gradient(y_batch, outputs)
-                # print("y_batch", y_batch)
-                # print("outputs", outputs)
-                # print("gradients", gradients)
+                # print("x", X_batch)
+                # print("y", y_batch)
+                # print("o", outputs)
+                # print("g", gradients)
+                # print("w", self.layers[0].neurons[0].parameters())
+                # print("wg", self.layers[0].neurons[0].parameters_gradient())
                 for j, x in enumerate(X_batch):
                     gradient = gradients[j]
                     for layer in reversed(self.layers):
