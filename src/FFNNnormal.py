@@ -34,10 +34,10 @@ class Neuron():
         return self.output
 
     def parameters(self):
-        return [self.bias] + self.weight
+        return [self.bias] + self.weight.tolist()
     
     def parameters_gradient(self):
-        return [self.gradient_bias] + self.gradient_weight
+        return [self.gradient_bias] + self.gradient_weight.tolist()
 
     def backward(self, gradient_output):
         if self.activation_function == "relu":
@@ -57,8 +57,6 @@ class Neuron():
     def update(self, learning_rate, batch_size):
         self.weight -= learning_rate * self.gradient_weight / batch_size
         self.bias -= learning_rate * self.gradient_bias / batch_size
-        self.gradient_weight.fill(0)
-        self.gradient_bias = 0
 
 class Layer():
     def __init__(self, n_input, n_output, activation_function="linear"):
@@ -85,7 +83,7 @@ class Layer():
         return [neuron.parameters_gradient() for neuron in self.neurons]
 
 class FFNN():
-    def __init__(self, layers, activation_functions, loss_function="mse", learning_rate=0.1, epoch=10, batch_size=10, verbose=1, random_state=0):
+    def __init__(self, layers, activation_functions, loss_function="mse", learning_rate=0.1, epoch=10, batch_size=1, verbose=1, random_state=0):
         self.layers = [Layer(layers[i], layers[i+1], activation_functions[i]) for i in range(len(layers)-1)]
         self.loss_function = loss_function
         self.learning_rate = learning_rate
@@ -111,6 +109,12 @@ class FFNN():
                 
                 neuron.weight = np.array(weights[:-1])
                 neuron.bias = weights[-1]
+                
+    def reset_gradients(self):
+        for layer in self.layers:
+            for neuron in layer.neurons:
+                neuron.gradient_weight.fill(0)
+                neuron.gradient_bias = 0
     
     def encode_labels(self, y):
         unique_labels = np.unique(y)
@@ -153,6 +157,7 @@ class FFNN():
             y_shuffled = y[indices]
             
             for i in range(0, n_samples, self.batch_size):
+                self.reset_gradients()
                 X_batch = X_shuffled[i:i+self.batch_size]
                 y_batch = y_shuffled[i:i+self.batch_size]
                 
@@ -193,9 +198,9 @@ class FFNN():
         dot = Digraph(graph_attr={'rankdir': "LR", 'splines': 'line', 
                                 "nodesep": '1', "ranksep": '1.5'})
 
-        input_nodes = [(f'{0}{0}', 'b0')]  # Bias node
+        input_nodes = [(f'{0}_{0}', 'b0')]  # Bias node
         for i in range(len(w[0][0]) - 1):
-            input_nodes.append((f'{0}{i+1}', f'X{i+1}'))
+            input_nodes.append((f'{0}_{i+1}', f'X{i+1}'))
 
         input_nodes.sort()
 
@@ -212,14 +217,14 @@ class FFNN():
             layer_nodes = []
             
             if i != len(self.layers) - 1:
-                layer_nodes.append((f'{i+1}{0}', f'b{i+1}'))
+                layer_nodes.append((f'{i+1}_{0}', f'b{i+1}'))
             
             # Neurons
             for j, neuron in enumerate(layer.neurons):
                 if i != len(self.layers) - 1:
-                    layer_nodes.append((f'{i+1}{j+1}', f'h{i+1}{j+1}'))
+                    layer_nodes.append((f'{i+1}_{j+1}', f'h{i+1}{j+1}'))
                 else:
-                    layer_nodes.append((f'{i+1}{j+1}', f'o{j+1}'))
+                    layer_nodes.append((f'{i+1}_{j+1}', f'o{j+1}'))
 
             layer_nodes.sort()
 
@@ -235,12 +240,12 @@ class FFNN():
             for j, neuron in enumerate(layer.neurons):
                 for k in range(len(w[i][j])):
                     weight_label = "{ w = %.4f | g = %.4f }" % (w[i][j][k], g[i][j][k])
-                    weight_node = f'w{i+1}{j+1}{k}'
+                    weight_node = f'w{i+1}_{j+1}_{k}'
 
                     dot.node(weight_node, weight_label, shape='record', width="1", height="0.5")
 
-                    dot.edge(f'{i}{k}', weight_node, tailport="e", headport="w")
-                    dot.edge(weight_node, f'{i+1}{j+1}', tailport="e", headport="w")
+                    dot.edge(f'{i}_{k}', weight_node, tailport="e", headport="w")
+                    dot.edge(weight_node, f'{i+1}_{j+1}', tailport="e", headport="w")
 
         return dot
 
