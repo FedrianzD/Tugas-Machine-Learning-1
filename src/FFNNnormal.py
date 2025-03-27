@@ -145,7 +145,7 @@ class FFNN():
         elif self.loss_function == "binary_cross_entropy":
             return -np.mean(y_pred - y_true) / (y_pred * (1 - y_pred) + 1e-9)
         elif self.loss_function == "categorical_cross_entropy":
-            return y_pred - y_true
+            return -np.mean(np.sum(y_true / (y_pred + 1e-9), axis=1))
     
     def fit(self, X, y):
         y = self.encode_labels(y)
