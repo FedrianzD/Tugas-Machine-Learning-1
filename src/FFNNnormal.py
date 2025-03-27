@@ -47,7 +47,7 @@ class Neuron():
         elif self.activation_function == "tanh":
             gradient_activation = gradient_output * (1 - self.output ** 2)
         elif self.activation_function == "softmax":
-            gradient_activation = gradient_output
+            gradient_activation = gradient_output * self.output * (np.eye(len(self.output)) - self.output.T)
         else:
             gradient_activation = gradient_output
         
@@ -141,9 +141,9 @@ class FFNN():
     
     def compute_loss_gradient(self, y_true, y_pred):
         if self.loss_function == "mse":
-            return -2 * (y_true - y_pred) / len(y_true)
+            return -2*np.mean(y_true - y_pred)
         elif self.loss_function == "binary_cross_entropy":
-            return (y_pred - y_true) / (y_pred * (1 - y_pred) + 1e-9)
+            return -np.mean(y_pred - y_true) / (y_pred * (1 - y_pred) + 1e-9)
         elif self.loss_function == "categorical_cross_entropy":
             return y_pred - y_true
     
