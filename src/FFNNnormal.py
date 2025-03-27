@@ -29,7 +29,7 @@ class Neuron():
         elif self.activation_function == "tanh":
             self.output = np.tanh(z)
         elif self.activation_function == "softmax":
-            exp_z = np.exp(z - np.max(z))
+            exp_z = np.exp(z)
             self.output = exp_z / exp_z.sum()
         return self.output
 
@@ -46,7 +46,8 @@ class Neuron():
             gradient_activation = gradient_output * (self.output * (1 - self.output))
         elif self.activation_function == "tanh":
             gradient_activation = gradient_output * (1 - self.output ** 2)
-        # elif self.activation_function == "softmax":
+        elif self.activation_function == "softmax":
+            gradient_activation = gradient_output
         else:
             gradient_activation = gradient_output
         
