@@ -45,7 +45,7 @@ class Neuron():
         elif self.activation_function == "tanh":
             self.gradient_delta = gradient_output * (1 - self.output ** 2)
         elif self.activation_function == "softmax":
-            self.gradient_delta = gradient_output
+            self.gradient_delta = gradient_output * self.output * (np.eye(len(self.output)) - self.output.T)
         else:
             self.gradient_delta = gradient_output
         
