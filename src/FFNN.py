@@ -57,8 +57,10 @@ class Neuron():
         self.gradient_bias += self.gradient_delta
 
     def update(self, learning_rate, batch_size):
-        self.weight -= learning_rate * self.gradient_weight / batch_size
-        self.bias -= learning_rate * self.gradient_bias / batch_size
+        # self.weight -= learning_rate * self.gradient_weight / batch_size
+        # self.bias -= learning_rate * self.gradient_bias / batch_size
+        self.weight -= learning_rate * self.gradient_weight
+        self.bias -= learning_rate * self.gradient_bias
 
 class Layer():
     def __init__(self, n_input, n_output, activation_function="linear"):
@@ -182,12 +184,6 @@ class FFNN():
                 total_loss += loss
                 
                 gradients = self.compute_loss_gradient(y_batch, outputs)
-                # print("x", X_batch)
-                # print("y", y_batch)
-                # print("o", outputs)
-                # print("g", gradients)
-                # print("w", self.layers[0].neurons[0].parameters())
-                # print("wg", self.layers[0].neurons[0].parameters_gradient())
                 for j, x in enumerate(X_batch):
                     gradient = gradients[j]
                     for layer in reversed(self.layers):
@@ -204,6 +200,13 @@ class FFNN():
                 print(f"Epoch {epoch+1}, Training Loss: {train_loss}")
                 if X_val is not None and y_val is not None:
                     print(f"Validation Loss: {validation_loss}")
+                    
+                # print("x", X_batch)
+                # print("y", y_batch)
+                # print("o", outputs)
+                # print("g", gradients)
+                # print("w", self.layers[0].neurons[0].parameters())
+                # print("wg", self.layers[0].neurons[0].parameters_gradient())
         if self.verbose == 1:
             print("Training completed.")
         return self.train_loss_epoch, self.validation_loss_epoch
