@@ -1,6 +1,9 @@
 import numpy as np
 import pickle
 from graphviz import Digraph
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
 
 class Neuron():
     def __init__(self, n_input, activation_function="linear"):
@@ -92,7 +95,8 @@ class FFNN():
         self.rng = np.random.default_rng(random_state)
         self.label_to_index = {}
         self.index_to_label = {}
-        self.
+        self.train_loss_epoch = []
+        self.validation_loss_epoch = []
         
     def weight_initializer(self, weight_initializer="zero", seed=0, lower_bound=-1, upper_bound=1, mean=0, variance=0.1):
         rng = np.random.default_rng(seed)
@@ -153,11 +157,13 @@ class FFNN():
             return -np.sum(y_true / (y_pred + 1e-9), axis=1).reshape(-1, 1) * np.ones((1, len(self.layers[-1].neurons)))
             # return y_pred - y_true
     
-    def fit(self, X, y):
+    def fit(self, X, y, X_val=None, y_val=None):
         y = self.encode_labels(y)
         n_samples = len(X)
         if self.loss_function == "categorical_cross_entropy":
             y = np.eye(len(self.label_to_index))[y]
+            if X_val is not None and y_val is not None:
+                y_val = np.eye(len(self.label_to_index))[self.encode_labels(y_val)]
         
         for epoch in range(self.epoch):
             total_loss = 0
@@ -189,8 +195,18 @@ class FFNN():
                 
                 for layer in self.layers:
                     layer.update(self.learning_rate, self.batch_size)
+            train_loss = total_loss / (n_samples / self.batch_size)
+            self.train_loss_epoch.append(train_loss)
+            if X_val is not None and y_val is not None:
+                validation_loss = self.compute_loss(y_val, self.predict_proba(X_val))
+                self.validation_loss_epoch.append(validation_loss)
             if self.verbose == 1:
-                print(f"Epoch {epoch+1}, Loss: {total_loss / (n_samples / self.batch_size)}")
+                print(f"Epoch {epoch+1}, Training Loss: {train_loss}")
+                if X_val is not None and y_val is not None:
+                    print(f"Validation Loss: {validation_loss}")
+        if self.verbose == 1:
+            print("Training completed.")
+        return self.train_loss_epoch, self.validation_loss_epoch
     
     def predict_proba(self, X):
         outputs = np.array([self(x) for x in X])
@@ -269,6 +285,81 @@ class FFNN():
                     dot.edge(weight_node, f'{i+1}_{j+1}', tailport="e", headport="w")
 
         return dot
+    
+    def visualize_weight_distributions(self, layers):
+        fig, axes = plt.subplots(len(layers), figsize=(12, 4*len(layers)))
+        if len(layers) == 1:
+            axes = [axes]
+        for i, layer_idx in enumerate(layers):
+            if not (0 <= layer_idx < len(self.layers)):
+                print(f"Invalid layer index: {layer_idx}")
+                continue
+            weights = [p for neuron in self.layers[layer_idx].neurons for p in neuron.weight]
+            weights += [neuron.bias for neuron in self.layers[layer_idx].neurons]
+            bins = np.linspace(min(weights), max(weights), 10)
+            sns.histplot(weights, bins=bins, kde=True, ax=axes[i])
+            axes[i].set_title(f'Weight Distribution - Layer {layer_idx + 1}')
+            axes[i].set_xlabel('Weight Value')
+            axes[i].set_ylabel('Frequency')
+            axes[i].set_xticks(np.round(bins, 2))
+        
+        plt.tight_layout()
+        plt.show()
+        
+    def visualize_weight_gradient_distributions(self, layers):
+        fig, axes = plt.subplots(len(layers), figsize=(12, 4*len(layers)))
+        for i, layer_idx in enumerate(layers):
+            if not (0 <= layer_idx < len(self.layers)):
+                print(f"Invalid layer index: {layer_idx}")
+                continue
+            weights = [p for neuron in self.layers[layer_idx].neurons for p in neuron.gradient_weight]
+            weights += [neuron.gradient_bias for neuron in self.layers[layer_idx].neurons]
+            bins = np.linspace(min(weights), max(weights), 10)
+            sns.histplot(weights, bins=bins, kde=True, ax=axes[i])
+            axes[i].set_title(f'Weight Gradient Distribution - Layer {layer_idx + 1}')
+            axes[i].set_xlabel('Weight Gradient Value')
+            axes[i].set_ylabel('Frequency')
+            axes[i].set_xticks(np.round(bins, 2))
+        plt.tight_layout()
+        plt.show()
+    def visualize_loss(self):
+        epochs = range(1, len(self.train_loss_epoch) + 1)
+        
+        loss_data = pd.DataFrame({
+            'Epoch': epochs,
+            'Training Loss': self.train_loss_epoch
+        })
+        
+        if self.validation_loss_epoch:
+            loss_data['Validation Loss'] = self.validation_loss_epoch
+        sns.set_theme(style="whitegrid")
+        plt.figure(figsize=(12, 6))
+        
+        sns.lineplot(
+            data=loss_data, 
+            x='Epoch', 
+            y='Training Loss', 
+            marker='o', 
+            color='blue', 
+            label='Training Loss'
+        )
+        
+        if 'Validation Loss' in loss_data.columns:
+            sns.lineplot(
+                data=loss_data, 
+                x='Epoch', 
+                y='Validation Loss', 
+                marker='x', 
+                color='red', 
+                label='Validation Loss'
+            )
+        
+        plt.title('Training and Validation Loss', fontsize=16)
+        plt.xlabel('Epoch', fontsize=12)
+        plt.ylabel('Loss', fontsize=12)
+        plt.legend(title='Loss Type')
+        plt.tight_layout()
+        plt.show()
 
     def save(self, filename='model.pkl'):
         with open(filename, 'wb') as f:
