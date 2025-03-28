@@ -27,17 +27,23 @@ cd Tugas-Machine-Learning-1
 pip install numpy matplotlib scikit-learn Digraph seaborn
 ```
 
+### 3. Run the Program
+
+```bash
+CTRL + Enter on tes.ipynb
+```
+
 ## Project Status
 
 Project is complete
 
 ## Team Members
 
-| **NIM**  |           **Nama**            |
-| :------: | :---------------------------: |
-| 13522020 | Aurelius Justin Philo Fanjaya |
-| 13522042 |         Amalia Putri          |
-| 13522090 |        Fedrianz Dharma        |
+| **NIM**  |           **Nama**            | **Kontribusi**                                             |
+| :------: | :---------------------------: | ---------------------------------------------------------- |
+| 13522020 | Aurelius Justin Philo Fanjaya |                                                            |
+| 13522042 |         Amalia Putri          | Activation Function, Loss Function, melengkapi dokumen 50% |
+| 13522090 |        Fedrianz Dharma        |                                                            |
 
 ## Program Structure
 
@@ -50,7 +56,7 @@ Project is complete
    ├── src
    │ ├── AutoDiff.py
    │ ├── FFNN.py
-   │ ├── FFNNnormal.py
+   │ ├── FFNNAutoDiff.py
    │ ├── tes.ipynb
    │ ├── tes.py
    │ ├── testAsisten.ipynb
