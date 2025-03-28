@@ -45,7 +45,8 @@ class Neuron():
         elif self.activation_function == "tanh":
             self.gradient_delta = gradient_output * (1 - self.output ** 2)
         elif self.activation_function == "softmax":
-            self.gradient_delta = gradient_output * self.output * (np.eye(len(self.output)) - self.output.T)
+            jacobian = np.diag(self.output) - np.outer(self.output, self.output)
+            self.gradient_delta = np.dot(jacobian, gradient_output)
         else:
             self.gradient_delta = gradient_output
         
@@ -91,6 +92,7 @@ class FFNN():
         self.rng = np.random.default_rng(random_state)
         self.label_to_index = {}
         self.index_to_label = {}
+        self.
         
     def weight_initializer(self, weight_initializer="zero", seed=0, lower_bound=-1, upper_bound=1, mean=0, variance=0.1):
         rng = np.random.default_rng(seed)
