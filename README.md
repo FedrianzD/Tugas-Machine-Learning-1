@@ -40,10 +40,10 @@ Project is complete
 ## Team Members
 
 | **NIM**  |           **Nama**            | **Kontribusi**                                             |
-| :------: | :---------------------------: | ---------------------------------------------------------- |
-| 13522020 | Aurelius Justin Philo Fanjaya |                                                            |
-| 13522042 |         Amalia Putri          | Activation Function, Loss Function, melengkapi dokumen 50% |
-| 13522090 |        Fedrianz Dharma        |                                                            |
+| :------: | :---------------------------: | --------------------------------------------------------------------------------------------------------- |
+| 13522020 | Aurelius Justin Philo Fanjaya | FFNN class, forward & back propagation, training, testing, autodiff                                       |
+| 13522042 |         Amalia Putri          | Activation Function, Loss Function, melengkapi dokumen 50%                                                |
+| 13522090 |        Fedrianz Dharma        | Visualisasi Weight Distribution, Visualisasi Weight Gradient Distribution, Laporan, Debug dan Fixing      |
 
 ## Program Structure
 
