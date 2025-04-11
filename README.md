@@ -50,17 +50,35 @@ Project is complete
 ```
 .
 └── TUGAS-MACHINE-LEARNING-1
-   ├── doc
-   │ └── Tubes1_13522020_13522042_13522090.pdf
-   |
    ├── src
-   │ ├── AutoDiff.py
-   │ ├── FFNN.py
-   │ ├── FFNNAutoDiff.py
-   │ ├── tes.ipynb
-   │ ├── tes.py
-   │ ├── testAsisten.ipynb
-   │ └── Utils.py
-   |
+   │   ├── AutoDiff
+   │   │   ├── AutoDiff.py
+   │   │   ├── AutoDiffTest.py
+   │   │   ├── FFNNAutoDiff.py
+   │   │   └── Utils.py
+   │   ├── models
+   │   │   ├── linear.pkl
+   │   │   ├── model.pkl
+   │   │   ├── model2.pkl
+   │   │   ├── model3.pkl
+   │   │   ├── model4.pkl
+   │   │   ├── model5.pkl
+   │   │   ├── model6.pkl
+   │   │   ├── model7.pkl
+   │   │   ├── model8.pkl
+   │   │   ├── model8batch.pkl
+   │   │   ├── model_L1.pkl
+   │   │   ├── model_L2.pkl
+   │   │   ├── model_sklearn.pkl
+   │   │   ├── model_sklearn_compare.pkl
+   │   │   ├── model_uniform.pkl
+   │   │   ├── model_zero.pkl
+   │   │   ├── sigmoid.pkl
+   │   │   └── tanh.pkl
+   │   ├── FFNN.py
+   │   ├── mnist_784_test.ipynb
+   │   ├── simple_test.ipynb
+   │   ├── training.ipynb
+   │   └── visualizeTraining.ipynb
    └── README.md
 ```
