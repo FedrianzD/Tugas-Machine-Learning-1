@@ -4,6 +4,7 @@ from graphviz import Digraph
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+from tqdm import trange
 
 class Neuron():
     def __init__(self, n_input, activation_function="linear"):
@@ -56,11 +57,13 @@ class Neuron():
         self.gradient_weight += self.gradient_delta * self.input
         self.gradient_bias += self.gradient_delta
 
-    def update(self, learning_rate, batch_size):
-        self.weight -= learning_rate * self.gradient_weight / batch_size
+    def update(self, learning_rate, batch_size, l1_lambda=0, l2_lambda=0):
+        # L1 and L2 gradients
+        l1_grad = l1_lambda * np.sign(self.weight)
+        l2_grad = l2_lambda * 2 * self.weight
+
+        self.weight -= learning_rate * (self.gradient_weight / batch_size + l1_grad + l2_grad)
         self.bias -= learning_rate * self.gradient_bias / batch_size
-        # self.weight -= learning_rate * self.gradient_weight
-        # self.bias -= learning_rate * self.gradient_bias
 
 class Layer():
     def __init__(self, n_input, n_output, activation_function="linear"):
@@ -76,9 +79,9 @@ class Layer():
             gradient_input += neuron.weight * neuron.gradient_delta
         return gradient_input
     
-    def update(self, learning_rate, batch_size):
+    def update(self, learning_rate, batch_size, l1_lambda=0, l2_lambda=0):
         for neuron in self.neurons:
-            neuron.update(learning_rate, batch_size)
+            neuron.update(learning_rate, batch_size, l1_lambda, l2_lambda)
             
     def parameters_matrix(self):
         return [neuron.parameters() for neuron in self.neurons]
@@ -87,7 +90,7 @@ class Layer():
         return [neuron.parameters_gradient() for neuron in self.neurons]
 
 class FFNN():
-    def __init__(self, layers, activation_functions, loss_function="mse", learning_rate=0.1, epoch=10, batch_size=1, verbose=1, random_state=0):
+    def __init__(self, layers, activation_functions, loss_function="mse", learning_rate=0.1, epoch=10, batch_size=1, verbose=1, random_state=0, l1_lambda=0, l2_lambda=0):
         self.layers = [Layer(layers[i], layers[i+1], activation_functions[i]) for i in range(len(layers)-1)]
         self.loss_function = loss_function
         self.learning_rate = learning_rate
@@ -99,6 +102,8 @@ class FFNN():
         self.index_to_label = {}
         self.train_loss_epoch = []
         self.validation_loss_epoch = []
+        self.l1_lambda = l1_lambda
+        self.l2_lambda = l2_lambda
         
     def weight_initializer(self, weight_initializer="zero", seed=0, lower_bound=-1, upper_bound=1, mean=0, variance=0.1):
         rng = np.random.default_rng(seed)
@@ -147,6 +152,16 @@ class FFNN():
             epsilon = 1e-15 
             y_pred = np.clip(y_pred, epsilon, 1 - epsilon)
             return -np.mean(np.sum(y_true * np.log(y_pred), axis=1))
+        
+        # L1 and L2 regularization
+        l1_penalty = 0
+        l2_penalty = 0
+        for layer in self.layers:
+            for neuron in layer.neurons:
+                l1_penalty += np.sum(np.abs(neuron.weight))
+                l2_penalty += np.sum(neuron.weight ** 2)
+        loss += self.l1_lambda * l1_penalty + self.l2_lambda * l2_penalty
+        return loss
     
     def compute_loss_gradient(self, y_true, y_pred):
         if self.loss_function == "mse":
@@ -166,8 +181,10 @@ class FFNN():
             y = np.eye(len(self.label_to_index))[y]
             if X_val is not None and y_val is not None:
                 y_val = np.eye(len(self.label_to_index))[self.encode_labels(y_val)]
+
+        epoch_iter = trange(self.epoch, desc="Training", unit="epoch", disable=(self.verbose != 1))
         
-        for epoch in range(self.epoch):
+        for epoch in epoch_iter:
             total_loss = 0
             indices = self.rng.permutation(n_samples)
             X_shuffled = X[indices]
@@ -179,7 +196,6 @@ class FFNN():
                 y_batch = y_shuffled[i:i+self.batch_size]
                 
                 outputs = np.array([self(x) for x in X_batch])
-                
                 loss = self.compute_loss(y_batch, outputs)
                 total_loss += loss
                 
@@ -190,23 +206,24 @@ class FFNN():
                         gradient = layer.backward(gradient)
                 
                 for layer in self.layers:
-                    layer.update(self.learning_rate, self.batch_size)
+                    layer.update(self.learning_rate, self.batch_size, self.l1_lambda, self.l2_lambda)
+            
             train_loss = total_loss / (n_samples // self.batch_size)
             self.train_loss_epoch.append(train_loss)
+
             if X_val is not None and y_val is not None:
                 validation_loss = self.compute_loss(y_val, self.predict_proba(X_val))
                 self.validation_loss_epoch.append(validation_loss)
+            else:
+                validation_loss = None
+
             if self.verbose == 1:
-                print(f"Epoch {epoch+1}, Training Loss: {train_loss}")
-                if X_val is not None and y_val is not None:
-                    print(f"Validation Loss: {validation_loss}")
-                    
-                # print("x", X_batch)
-                # print("y", y_batch)
-                # print("o", outputs)
-                # print("g", gradients)
-                # print("w", self.layers[0].neurons[0].parameters())
-                # print("wg", self.layers[0].neurons[0].parameters_gradient())
+                loss_msg = f"Train Loss: {train_loss:.4f}"
+                if validation_loss is not None:
+                    loss_msg += f" | Val Loss: {validation_loss:.4f}"
+                epoch_iter.set_description(f"Epoch {epoch+1}")
+                epoch_iter.set_postfix_str(loss_msg)
+
         if self.verbose == 1:
             print("Training completed.")
         return self.train_loss_epoch, self.validation_loss_epoch
